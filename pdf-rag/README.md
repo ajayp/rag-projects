@@ -74,11 +74,11 @@ Opens at `http://localhost:7860`. Upload PDFs via the sidebar, then ask question
 
 ### Search options
 
-| Option | What it does | When to use |
-|--------|-------------|-------------|
-| **Query expansion** | Adds synonyms and related terms to your query | Your wording differs from the document's terminology (e.g. "rerank" vs "cross-encoder") |
-| **HyDE** | Generates a hypothetical answer and searches with it | Conceptual questions where phrasing is the gap, not specific terms — ⚠️ the LLM may hallucinate model names or frameworks it doesn't know, leading to worse retrieval than query expansion for technical documents |
-| **Search mode slider** | 0 = keyword only (BM25), 1 = semantic only (vector) | Tune per document type; default 0.75 works well for technical docs |
+| Option | What it *actually* does | When it's the right tool | When it will absolutely betray you |
+| --- | --- | --- | --- |
+| **Query Expansion** | Deterministically broadens the query using known synonyms, aliases, taxonomies, or controlled vocabularies. | When user phrasing ≠ corpus phrasing. When you need higher recall without semantic drift. | When expansions are LLM-generated instead of dictionary-driven — you get invented synonyms and polluted retrieval. |
+| **HyDE** | Generates a hypothetical "ideal answer", embeds it, and retrieves documents semantically similar to that hallucinated answer. | Conceptual, prose-heavy, narrative corpora. Questions about mechanisms, explanations, or high-level reasoning. | Technical domains, API names, model names, framework questions, entity-sensitive retrieval. HyDE hallucinates terms → retrieval collapses. |
+| **Search mode slider** | Blends BM25 keyword matching with semantic vector search. 0 = keyword only, 1 = semantic only. | Default 0.75 works well for technical docs. Slide toward 0 for exact-term queries, toward 1 for conceptual ones. | Pure BM25 (0) misses synonyms; pure vector (1) misses rare technical terms that don't embed distinctively. |
 
 ### Not implemented: reranking
 
