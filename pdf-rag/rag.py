@@ -601,7 +601,7 @@ Passage:"""
             }
     
     def rewrite_query(self, question: str) -> str:
-        prompt = f"""You are a search query expander for a technical document retrieval system. Expand the question into a short search query that includes the core topic plus relevant synonyms and related technical terms. Return only the expanded query, nothing else.
+        prompt = f"""You are a search query expander for a technical document retrieval system. Expand the question into a short search query that includes the core topic plus relevant synonyms and related technical terms. Use English only. Return only the expanded query, nothing else.
 
 Question: what models to use for rerank
 Expanded: rerank cross-encoder reranker bi-encoder two-stage retrieval ms-marco bge-reranker
