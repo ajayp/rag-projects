@@ -9,6 +9,8 @@ A fully local RAG system that answers natural language questions over PDF docume
 - Local embedding and generation with **Ollama** (`nomic-embed-text` + `qwen2.5:14b`)
 - Hybrid search — BM25 keyword + semantic vector with a tunable alpha slider
 - Two-pass chunking: markdown structure first, then sentence-level size limits — chunks never cross page boundaries
+- **Result filtering** — bare header chunks and table-of-contents entries are filtered out before being passed to the LLM, preventing low-content results from occupying source slots
+- **Result deduplication** — identical chunks are deduplicated before context assembly
 - Answers include **source citations** — page numbers and section names from the original document
 - **Query expansion** — LLM adds synonyms and related terms before searching, bridging vocabulary gaps between your question and the document's language
 - **HyDE** (Hypothetical Document Embeddings) — LLM generates a hypothetical answer passage and searches with that, improving retrieval for conceptual questions

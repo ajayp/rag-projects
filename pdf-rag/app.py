@@ -1,6 +1,6 @@
 import os
 import gradio as gr
-from cli import LocalRAGSystem
+from rag import LocalRAGSystem
 
 rag = LocalRAGSystem(
     embedding_model="nomic-embed-text",
