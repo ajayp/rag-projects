@@ -78,6 +78,10 @@ Opens at `http://localhost:7860`. Upload PDFs via the sidebar, then ask question
 | **HyDE** | Generates a hypothetical answer and searches with it | Conceptual questions where phrasing is the gap, not specific terms |
 | **Search mode slider** | 0 = keyword only (BM25), 1 = semantic only (vector) | Tune per document type; default 0.75 works well for technical docs |
 
+### Not implemented: reranking
+
+Cross-encoder reranking (e.g. `ms-marco-MiniLM-L-6-v2`, `BAAI/bge-reranker-large`) would improve retrieval precision further but is not implemented. It requires `sentence-transformers` as an additional dependency and adds latency on top of local LLM generation. With hybrid search and query expansion already in place, reranking is unlikely to be the bottleneck for single-document use cases — but is a natural next step for multi-document setups where candidates are harder to rank.
+
 ---
 
 ## Cleanup
