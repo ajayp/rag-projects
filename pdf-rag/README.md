@@ -75,7 +75,7 @@ Opens at `http://localhost:7860`. Upload PDFs via the sidebar, then ask question
 | Option | What it does | When to use |
 |--------|-------------|-------------|
 | **Query expansion** | Adds synonyms and related terms to your query | Your wording differs from the document's terminology (e.g. "rerank" vs "cross-encoder") |
-| **HyDE** | Generates a hypothetical answer and searches with it | Conceptual questions where phrasing is the gap, not specific terms |
+| **HyDE** | Generates a hypothetical answer and searches with it | Conceptual questions where phrasing is the gap, not specific terms — ⚠️ the LLM may hallucinate model names or frameworks it doesn't know, leading to worse retrieval than query expansion for technical documents |
 | **Search mode slider** | 0 = keyword only (BM25), 1 = semantic only (vector) | Tune per document type; default 0.75 works well for technical docs |
 
 ### Not implemented: reranking
