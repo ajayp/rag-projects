@@ -4,7 +4,7 @@ from cli import LocalRAGSystem
 
 rag = LocalRAGSystem(
     embedding_model="nomic-embed-text",
-    generative_model="llama3.2",
+    generative_model="qwen2.5:14b",
 )
 
 def get_stats_md() -> str:
@@ -47,14 +47,14 @@ def reset_collection():
     return "✅ Collection reset.", get_stats_md(), gr.update(choices=[], value=None)
 
 
-def submit(message, history, doc_choice, rewrite):
+def submit(message, history, doc_choice, rewrite, alpha, use_hyde):
     if not message.strip():
         return history, ""
     query = rag.rewrite_query(message) if rewrite else message
     source_file = resolve_source_file(doc_choice)
-    answer = rag.ask_question(query, source_file=source_file)
+    answer = rag.ask_question(query, source_file=source_file, alpha=alpha, use_hyde=use_hyde)
     if rewrite and query != message:
-        answer = f"🔄 *Searched for: \"{query}\"*\n\n{answer}"
+        answer = f"🔍 *Expanded query: \"{query}\"*\n\n{answer}"
     history.append({"role": "user", "content": message})
     history.append({"role": "assistant", "content": answer})
     return history, ""
@@ -89,7 +89,9 @@ with gr.Blocks(title="Local RAG") as demo:
                     show_label=False,
                 )
                 submit_btn = gr.Button("Send", variant="primary", scale=1)
-            rewrite_toggle = gr.Checkbox(label="Query rewriting", value=False, info="Extracts core search terms before querying — helps with conversational questions")
+            rewrite_toggle = gr.Checkbox(label="Query expansion", value=False, info="Adds synonyms and related terms before querying — helps when your wording differs from the document's")
+            hyde_toggle = gr.Checkbox(label="HyDE", value=False, info="Generates a hypothetical answer and searches with that — helps bridge the gap between short questions and long document passages")
+            alpha_slider = gr.Slider(minimum=0.0, maximum=1.0, value=0.75, step=0.05, label="Search mode", info="0 = keyword only (BM25) · 1 = semantic only (vector)")
 
     process_btn.click(
         process_pdf,
@@ -101,8 +103,8 @@ with gr.Blocks(title="Local RAG") as demo:
         inputs=[],
         outputs=[process_status, stats_md, doc_dropdown],
     )
-    submit_btn.click(submit, [msg_input, chatbot, doc_dropdown, rewrite_toggle], [chatbot, msg_input])
-    msg_input.submit(submit, [msg_input, chatbot, doc_dropdown, rewrite_toggle], [chatbot, msg_input])
+    submit_btn.click(submit, [msg_input, chatbot, doc_dropdown, rewrite_toggle, alpha_slider, hyde_toggle], [chatbot, msg_input])
+    msg_input.submit(submit, [msg_input, chatbot, doc_dropdown, rewrite_toggle, alpha_slider, hyde_toggle], [chatbot, msg_input])
 
 
 if __name__ == "__main__":

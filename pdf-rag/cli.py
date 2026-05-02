@@ -19,7 +19,7 @@ class LocalRAGSystem:
                  ollama_url: str = "http://localhost:11434",
                  llamaparse_api_key: str = None,
                  embedding_model: str = "nomic-embed-text",
-                 generative_model: str = "llama3.2"):
+                 generative_model: str = "qwen2.5:14b"):
         """
         Complete local RAG system with Ollama and Weaviate v4
         """
@@ -379,32 +379,46 @@ class LocalRAGSystem:
             "pageChunkIndex": obj.properties.get("pageChunkIndex"),
             "totalPages": obj.properties.get("totalPages"),
             "_additional": {
-                "score": obj.metadata.score,
-                "distance": obj.metadata.distance,
+                "score": getattr(obj.metadata, "score", None),
+                "distance": getattr(obj.metadata, "distance", None),
             },
         }
 
     def _source_filter(self, source_file: Optional[str] = None):
         return Filter.by_property("sourceFile").equal(source_file) if source_file else None
 
-    def search(self, query: str, limit: int = 5, source_file: Optional[str] = None) -> List[Dict]:
+    def search(self, query: str, limit: int = 5, source_file: Optional[str] = None, min_content_length: int = 150, alpha: float = 0.75) -> List[Dict]:
         collection = self.client.collections.get("DocumentChunk")
-        response = collection.query.near_text(
+        # alpha: 0.0 = pure BM25 (keyword), 1.0 = pure vector (semantic)
+        # Over-fetch so we have candidates left after filtering bare headers.
+        response = collection.query.hybrid(
             query=query,
-            limit=limit,
-            filters=self._source_filter(source_file),
-            return_metadata=wvc.query.MetadataQuery(score=True, distance=True)
-        )
-        return [self._obj_to_dict(obj) for obj in response.objects]
-
-    def section_filtered_search(self, query: str, required_sections: List[str], limit: int = 5, source_file: Optional[str] = None) -> List[Dict]:
-        """Search within specific document sections."""
-        collection = self.client.collections.get("DocumentChunk")
-        response = collection.query.near_text(
-            query=query,
+            alpha=alpha,
             limit=limit * 3,
             filters=self._source_filter(source_file),
-            return_metadata=wvc.query.MetadataQuery(score=True, distance=True)
+            return_metadata=wvc.query.MetadataQuery(score=True)
+        )
+        results = []
+        for obj in response.objects:
+            content = obj.properties.get("content", "")
+            if len(content) >= min_content_length:
+                results.append(self._obj_to_dict(obj))
+                if len(results) >= limit:
+                    break
+        # Fall back to unfiltered results if nothing passes the length threshold
+        if not results:
+            results = [self._obj_to_dict(obj) for obj in response.objects[:limit]]
+        return results
+
+    def section_filtered_search(self, query: str, required_sections: List[str], limit: int = 5, source_file: Optional[str] = None, alpha: float = 0.75) -> List[Dict]:
+        """Search within specific document sections."""
+        collection = self.client.collections.get("DocumentChunk")
+        response = collection.query.hybrid(
+            query=query,
+            alpha=alpha,
+            limit=limit * 3,
+            filters=self._source_filter(source_file),
+            return_metadata=wvc.query.MetadataQuery(score=True)
         )
         results = []
         for obj in response.objects:
@@ -415,14 +429,15 @@ class LocalRAGSystem:
                     break
         return results
 
-    def search_by_page(self, query: str, page_numbers: Optional[List[int]] = None, limit: int = 5, source_file: Optional[str] = None) -> List[Dict]:
+    def search_by_page(self, query: str, page_numbers: Optional[List[int]] = None, limit: int = 5, source_file: Optional[str] = None, alpha: float = 0.75) -> List[Dict]:
         """Search within specific pages."""
         collection = self.client.collections.get("DocumentChunk")
-        response = collection.query.near_text(
+        response = collection.query.hybrid(
             query=query,
+            alpha=alpha,
             limit=limit * 3,
             filters=self._source_filter(source_file),
-            return_metadata=wvc.query.MetadataQuery(score=True, distance=True)
+            return_metadata=wvc.query.MetadataQuery(score=True)
         )
         if not page_numbers:
             return [self._obj_to_dict(obj) for obj in response.objects[:limit]]
@@ -434,22 +449,54 @@ class LocalRAGSystem:
                     break
         return results
 
-    def ask_question(self, question: str, max_chunks: int = 5, section_filter: Optional[List[str]] = None, page_filter: Optional[List[int]] = None, source_file: Optional[str] = None) -> str:
+    def generate_hypothetical_answer(self, question: str) -> str:
+        prompt = f"""Write a short, technically detailed passage (2-4 sentences) that directly answers the following question. Write as if you are the document being searched — use specific terms, model names, and technical details that would appear in a technical document.
+
+Question: {question}
+Passage:"""
+        try:
+            response = requests.post(
+                f"{self.ollama_url}/api/generate",
+                json={"model": self.generative_model, "prompt": prompt, "stream": False},
+                timeout=30,
+            )
+            response.raise_for_status()
+            hypothetical = response.json().get("response", question).strip()
+            print(f"💭 HyDE passage: {hypothetical[:100]}...")
+            return hypothetical
+        except Exception:
+            return question
+
+    def ask_question(self, question: str, max_chunks: int = 5, section_filter: Optional[List[str]] = None, page_filter: Optional[List[int]] = None, source_file: Optional[str] = None, alpha: float = 0.75, use_hyde: bool = False) -> str:
         print(f"\n🤔 Question: {question}")
 
+        search_query = question
+        if use_hyde:
+            search_query = self.generate_hypothetical_answer(question)
+
         if page_filter:
-            chunks = self.search_by_page(question, page_filter, max_chunks, source_file)
+            chunks = self.search_by_page(search_query, page_filter, max_chunks, source_file, alpha=alpha)
             print(f"🔍 Found {len(chunks)} chunks in pages: {page_filter}")
         elif section_filter:
-            chunks = self.section_filtered_search(question, section_filter, max_chunks, source_file)
+            chunks = self.section_filtered_search(search_query, section_filter, max_chunks, source_file, alpha=alpha)
             print(f"🔍 Found {len(chunks)} chunks in sections: {section_filter}")
         else:
-            chunks = self.search(question, max_chunks, source_file)
+            chunks = self.search(search_query, max_chunks, source_file, alpha=alpha)
             print(f"🔍 Found {len(chunks)} relevant chunks")
         
         if not chunks:
             return "❌ No relevant information found in the documents."
-        
+
+        # Deduplicate by chunkIndex to avoid repeating the same chunk in context
+        seen = set()
+        unique_chunks = []
+        for chunk in chunks:
+            key = (chunk.get("sourceFile"), chunk.get("chunkIndex"))
+            if key not in seen:
+                seen.add(key)
+                unique_chunks.append(chunk)
+        chunks = unique_chunks
+
         # Build context with page and header information
         context_parts = []
         for i, chunk in enumerate(chunks):
@@ -468,16 +515,16 @@ class LocalRAGSystem:
         context = "\n\n" + "="*50 + "\n\n".join(context_parts)
         
         # Build the prompt
-        prompt = f"""Based on the following sources, answer this question: {question}
+        prompt = f"""Answer this question using ONLY the sources provided below: {question}
 
     Sources:
     {context}
 
     Instructions:
-    - Answer based only on the provided sources
+    - Use ONLY information explicitly stated in the sources above. Do NOT use outside knowledge.
+    - Do NOT invent definitions, acronym expansions, or explanations not present in the sources.
+    - If the sources do not contain enough information to answer, say exactly: "The provided documents do not contain enough information to answer this question."
     - Reference specific document sections and page numbers when relevant
-    - If the sources don't contain enough information, say so clearly
-    - Be specific about which document section and page your answer comes from
     - Keep your answer concise but complete
 
     Answer:"""
@@ -554,19 +601,22 @@ class LocalRAGSystem:
             }
     
     def rewrite_query(self, question: str) -> str:
-        prompt = f"""You are a search query optimizer. Extract the core topic or concept being asked about. Return only the optimized search query, nothing else.
+        prompt = f"""You are a search query expander for a technical document retrieval system. Expand the question into a short search query that includes the core topic plus relevant synonyms and related technical terms. Return only the expanded query, nothing else.
 
-Question: tell me about rerank
-Optimized: rerank
+Question: what models to use for rerank
+Expanded: rerank cross-encoder reranker bi-encoder two-stage retrieval ms-marco bge-reranker
 
-Question: what does the document say about data protection
-Optimized: data protection
+Question: how does chunking work
+Expanded: chunking text splitting document segmentation sentence splitting chunk size overlap
 
-Question: can you explain how chunking works in RAG systems
-Optimized: chunking RAG systems
+Question: what is RAG
+Expanded: RAG retrieval augmented generation retrieval-augmented pipeline architecture
+
+Question: how to reduce hallucination
+Expanded: hallucination reduction grounding faithfulness factuality citation verification
 
 Question: {question}
-Optimized:"""
+Expanded:"""
         try:
             response = requests.post(
                 f"{self.ollama_url}/api/generate",
@@ -575,7 +625,7 @@ Optimized:"""
             )
             response.raise_for_status()
             rewritten = response.json().get("response", question).strip()
-            print(f"🔄 Query rewritten: '{question}' → '{rewritten}'")
+            print(f"🔄 Query expanded: '{question}' → '{rewritten}'")
             return rewritten
         except Exception:
             return question
@@ -590,76 +640,3 @@ Optimized:"""
     def close(self):
         self.client.close()
 
-def main():
-    # Initialize the system
-    rag_system = LocalRAGSystem(
-        llamaparse_api_key=None,
-        embedding_model="nomic-embed-text",
-        generative_model="llama3.2"
-    )
-    
-    try:
-        # Process with page-aware approach (only if you haven't already)
-        print("\nChecking if document needs to be processed...")
-        stats = rag_system.get_document_stats()
-        
-        fresh = stats['total_chunks'] == 0
-        if fresh:
-            print("No documents found, processing document...")
-            rag_system.process_document("./docs/reinsurance-agreement.pdf", use_llamaparse=True)
-        else:
-            print(f"Found existing data: {stats['total_chunks']} chunks from {len(stats['documents'])} documents")
-
-        print("\n" + "="*60)
-        print("🤖 PAGE-AWARE LOCAL RAG SYSTEM READY!")
-        print("="*60)
-        print("💡 Try commands like:")
-        print("   - Regular question: 'What are the coverage limits?'")
-        print("   - Page-specific: 'page:1,2 What's on the first two pages?'")
-        print("   - Section-specific: 'section:Definitions What is reinsurance?'")
-
-        if fresh:
-            print("\n🧪 Testing with a simple query...")
-            test_answer = rag_system.ask_question("What is this document about?", max_chunks=2)
-            print(f"Test query result: {test_answer[:200]}...")
-        
-        while True:
-            question = input("\n💬 Ask a question (or 'quit' to exit): ").strip()
-            
-            if question.lower() in ['quit', 'exit', 'q']:
-                break
-                
-            if not question:
-                continue
-            
-            # Parse special commands
-            page_filter = None
-            section_filter = None
-            
-            if question.startswith('page:'):
-                parts = question.split(' ', 1)
-                if len(parts) == 2:
-                    page_nums = parts[0][5:]  # Remove 'page:'
-                    page_filter = [int(p.strip()) for p in page_nums.split(',')]
-                    question = parts[1]
-                    print(f"🔍 Searching in pages: {page_filter}")
-            
-            elif question.startswith('section:'):
-                parts = question.split(' ', 1)
-                if len(parts) == 2:
-                    sections = parts[0][8:]  # Remove 'section:'
-                    section_filter = [s.strip() for s in sections.split(',')]
-                    question = parts[1]
-                    print(f"🔍 Searching in sections: {section_filter}")
-            
-            try:
-                answer = rag_system.ask_question(question, page_filter=page_filter, section_filter=section_filter)
-                print(f"\n🤖 Answer:\n{answer}")
-            except Exception as e:
-                print(f"❌ Error answering question: {e}")
-    
-    finally:
-        rag_system.close()
-
-if __name__ == "__main__":
-    main()

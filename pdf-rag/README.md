@@ -6,10 +6,13 @@ A fully local RAG system that answers natural language questions over PDF docume
 ## Features
 - Intelligent PDF parsing with **LlamaParse** — preserves page structure, tables, and sections
 - Vector storage and retrieval with **Weaviate**
-- Local embedding and generation with **Ollama** (`nomic-embed-text` + `llama3.2`)
+- Local embedding and generation with **Ollama** (`nomic-embed-text` + `qwen2.5:14b`)
+- Hybrid search — BM25 keyword + semantic vector with a tunable alpha slider
 - Two-pass chunking: markdown structure first, then sentence-level size limits — chunks never cross page boundaries
 - Answers include **source citations** — page numbers and section names from the original document
-- Browser UI with drag-and-drop PDF upload, document filter, and optional query rewriting
+- **Query expansion** — LLM adds synonyms and related terms before searching, bridging vocabulary gaps between your question and the document's language
+- **HyDE** (Hypothetical Document Embeddings) — LLM generates a hypothetical answer passage and searches with that, improving retrieval for conceptual questions
+- Browser UI with drag-and-drop PDF upload and document filter
 
 ---
 <img width="1207" alt="image" src="https://github.com/user-attachments/assets/f619be37-3802-4042-90eb-03ad2d39a544" />
@@ -60,24 +63,26 @@ export LLAMAPARSE_API_KEY="your_api_key_here"
 
 ## Usage
 
-### Browser UI (recommended)
 ```bash
 python app.py
 ```
-Opens at `http://localhost:7860`. Upload PDFs via the sidebar, select a document from the dropdown to scope queries, and enable **Query rewriting** to handle conversational questions.
 
-### CLI
-```bash
-python cli.py
-```
-Interactive terminal session. Supports `page:1,2` and `section:Definitions` prefixes to filter results. Type `quit` to exit.
+Opens at `http://localhost:7860`. Upload PDFs via the sidebar, then ask questions in the chat.
+
+### Search options
+
+| Option | What it does | When to use |
+|--------|-------------|-------------|
+| **Query expansion** | Adds synonyms and related terms to your query | Your wording differs from the document's terminology (e.g. "rerank" vs "cross-encoder") |
+| **HyDE** | Generates a hypothetical answer and searches with it | Conceptual questions where phrasing is the gap, not specific terms |
+| **Search mode slider** | 0 = keyword only (BM25), 1 = semantic only (vector) | Tune per document type; default 0.75 works well for technical docs |
 
 ---
 
 ## Cleanup
 
 ```bash
-docker compose down          # stop Weaviate
-ollama rm nomic-embed-text   # remove embedding model (optional)
-ollama rm llama3.2           # remove generative model (optional)
+docker compose down           # stop Weaviate
+ollama rm nomic-embed-text    # remove embedding model (optional)
+ollama rm qwen2.5:14b         # remove generative model (optional)
 ```
