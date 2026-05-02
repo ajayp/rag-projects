@@ -15,7 +15,8 @@ A fully local RAG system that answers natural language questions over PDF docume
 - Browser UI with drag-and-drop PDF upload and document filter
 
 ---
-<img width="1207" alt="image" src="https://github.com/user-attachments/assets/f619be37-3802-4042-90eb-03ad2d39a544" />
+<img width="1434" height="984" alt="image" src="https://github.com/user-attachments/assets/58590644-e719-4cac-b9e7-95908231ab16" />
+
 
 ---
 
