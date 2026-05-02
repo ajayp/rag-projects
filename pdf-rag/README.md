@@ -97,3 +97,6 @@ docker compose down           # stop Weaviate
 ollama rm nomic-embed-text    # remove embedding model (optional)
 ollama rm qwen2.5:14b         # remove generative model (optional)
 ```
+
+
+<img width="1373" height="381" alt="image" src="https://github.com/user-attachments/assets/62419464-9f10-4a3d-aacd-aa4c1a82ce65" />
