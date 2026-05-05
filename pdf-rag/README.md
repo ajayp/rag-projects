@@ -179,6 +179,3 @@ Multi-hop retrieval (iterative retrieval where the answer to one query informs t
 ```bash
 docker compose down  # stop Weaviate + Redis
 ```
-
-
-<img width="1373" height="381" alt="image" src="https://github.com/user-attachments/assets/62419464-9f10-4a3d-aacd-aa4c1a82ce65" />
