@@ -9,9 +9,9 @@ A collection of Retrieval-Augmented Generation (RAG) projects built with [Weavia
 
 A production-style RAG system for answering natural language questions over PDF documents. Parses PDFs with LlamaParse (preserving page and section structure), stores embeddings in Weaviate, and generates cited answers with page references using Ollama — no external LLM API required at inference time.
 
-Features hybrid BM25 + semantic search, query expansion, and HyDE (Hypothetical Document Embeddings) to improve retrieval across different query types.
+Features hybrid BM25 + semantic search, query expansion (via `gemma3:1b`), HyDE (Hypothetical Document Embeddings), and a Redis-backed semantic cache that serves repeated or semantically similar questions without hitting the LLM again.
 
-**Stack:** Python · Weaviate · Ollama · LlamaParse · Browser UI
+**Stack:** Python · Weaviate · Ollama · LlamaParse · Redis · Browser UI
 
 ---
 
@@ -35,6 +35,9 @@ Both projects require:
 # Pull the models used across projects
 ollama pull nomic-embed-text   # embeddings
 ollama pull qwen2.5:14b        # text generation
+ollama pull gemma3:1b          # query rewrite (pdf-rag)
 ```
+
+**pdf-rag** also requires **Redis** (semantic cache) — run alongside Weaviate via `docker compose up -d`.
 
 See each project's README for setup and run instructions.

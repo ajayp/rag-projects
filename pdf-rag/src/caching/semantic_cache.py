@@ -89,10 +89,6 @@ class SemanticCache:
             print(f"[cache] set error (skipping): {e}")
 
     def clear(self) -> bool:
-        """
-        Clears the entire cache. redisvl doesn't support per-document deletion,
-        so re-indexing any document clears all cached answers.
-        """
         if not self.is_available():
             return False
         try:
