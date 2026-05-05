@@ -1,5 +1,13 @@
 ---
 services:
+  redis:
+    image: redis/redis-stack-server:latest
+    ports:
+      - "6379:6379"
+    restart: on-failure:0
+    volumes:
+      - redis_data:/data
+
   weaviate:
     command:
     - --host
@@ -9,7 +17,9 @@ services:
     - --scheme
     - http
     image: cr.weaviate.io/semitechnologies/weaviate:1.31.1
-    network_mode: host  # This allows Weaviate to access localhost services
+    ports:
+      - "8080:8080"
+      - "50051:50051"
     volumes:
     - weaviate_data:/var/lib/weaviate
     restart: on-failure:0
@@ -20,6 +30,8 @@ services:
       ENABLE_API_BASED_MODULES: 'true'
       ENABLE_MODULES: 'text2vec-ollama,generative-ollama'
       CLUSTER_HOSTNAME: 'node1'
+      OLLAMA_HOST: 'http://host.docker.internal:11434'
 volumes:
   weaviate_data:
+  redis_data:
 

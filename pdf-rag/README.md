@@ -12,11 +12,96 @@ A fully local RAG system that answers natural language questions over PDF docume
 - **Result filtering** — bare header chunks and table-of-contents entries are filtered out before being passed to the LLM, preventing low-content results from occupying source slots
 - **Result deduplication** — identical chunks are deduplicated before context assembly
 - Answers include **source citations** — page numbers and section names from the original document
-- **Query expansion** — LLM adds synonyms and related terms before searching, bridging vocabulary gaps between your question and the document's language
+- **Query expansion** — runs via `gemma3:1b` (fast, lightweight) to add synonyms and related terms before searching, bridging vocabulary gaps between your question and the document's language
 - **HyDE** (Hypothetical Document Embeddings) — LLM generates a hypothetical answer passage and searches with that, improving retrieval for conceptual questions
+- **Semantic cache** — repeated or semantically similar questions are served from Redis without hitting the LLM again, reducing latency on common queries
 - Browser UI with drag-and-drop PDF upload and document filter
 
 ---
+
+## Query Pipeline
+
+```
+┌─────────────────────────────────┐
+│         User Question           │
+│          (Gradio UI)            │
+└────────────────┬────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────┐
+│       Semantic Cache Check      │◄─── SemanticCache (cache.py)
+└────────────────┬────────────────┘
+        hit │         │ miss
+            │         ▼
+            │  ┌──────────────────┐
+            │  │  Query Rewrite?  │  (optional)
+            │  └────────┬─────────┘
+            │    no │       │ yes
+            │       │       ▼
+            │       │  ┌───────────────────────┐
+            │       │  │  rewrite_query()       │
+            │       │  │  gemma3:1b (fast)      │
+            │       │  └──────────┬────────────┘
+            │       │             │
+            │       └──────┬──────┘
+            │              │
+            │              ▼
+            │  ┌──────────────────────┐
+            │  │      HyDE?           │  (optional)
+            │  └──────────┬───────────┘
+            │    no │         │ yes
+            │       │         ▼
+            │       │  ┌────────────────────────┐
+            │       │  │ generate_hypothetical_ │
+            │       │  │ answer() qwen2.5:14b   │
+            │       │  └──────────┬─────────────┘
+            │       │             │
+            │       └──────┬──────┘
+            │              │
+            │              ▼
+            │  ┌───────────────────────────────┐
+            │  │          search()             │
+            │  │  Hybrid BM25 + Vector (α=0.75)│
+            │  │  Weaviate ← nomic-embed-text  │
+            │  │                               │
+            │  │  variants:                    │
+            │  │  • search_by_page()           │
+            │  │  • section_filtered_search()  │
+            │  └──────────────┬────────────────┘
+            │                 │
+            │                 ▼
+            │  ┌───────────────────────────────┐
+            │  │  Filter & Deduplicate Chunks  │
+            │  │  (drop chunks < 150 chars)    │
+            │  └──────────────┬────────────────┘
+            │                 │
+            │                 ▼
+            │  ┌───────────────────────────────┐
+            │  │  Build Cited Context (top-K)  │
+            │  └──────────────┬────────────────┘
+            │                 │
+            │                 ▼
+            │  ┌───────────────────────────────┐
+            │  │       ask_question()          │
+            │  │       qwen2.5:14b             │
+            │  └──────────────┬────────────────┘
+            │                 │
+            │                 ▼
+            │  ┌───────────────────────────────┐
+            │  │      Store in Cache           │
+            │  └──────────────┬────────────────┘
+            │                 │
+            └────────►────────┘
+                      │
+                      ▼
+         ┌────────────────────────┐
+         │   Answer + Citations   │
+         │      (Gradio UI)       │
+         └────────────────────────┘
+```
+
+---
+
 <img width="1434" height="984" alt="image" src="https://github.com/user-attachments/assets/58590644-e719-4cac-b9e7-95908231ab16" />
 
 
@@ -93,9 +178,10 @@ Multi-hop retrieval (iterative retrieval where the answer to one query informs t
 ## Cleanup
 
 ```bash
-docker compose down           # stop Weaviate
+docker compose down           # stop Weaviate + Redis
 ollama rm nomic-embed-text    # remove embedding model (optional)
 ollama rm qwen2.5:14b         # remove generative model (optional)
+ollama rm gemma3:1b           # remove query rewrite model (optional)
 ```
 
 

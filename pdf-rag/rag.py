@@ -1,3 +1,4 @@
+import atexit
 import weaviate
 import weaviate.classes as wvc
 from weaviate.classes.config import Configure, Property, DataType
@@ -12,24 +13,28 @@ import hashlib
 import json
 import os
 from urllib.parse import urlparse
+from cache import SemanticCache
 
 class LocalRAGSystem:
-    def __init__(self, 
+    COLLECTION_NAME = "DocumentChunk"
+
+    def __init__(self,
                  weaviate_url: str = "http://localhost:8080",
                  ollama_url: str = "http://localhost:11434",
                  llamaparse_api_key: str = None,
                  embedding_model: str = "nomic-embed-text",
-                 generative_model: str = "qwen2.5:14b"):
-        """
-        Complete local RAG system with Ollama and Weaviate v4
-        """
+                 generative_model: str = "qwen2.5:14b",
+                 rewrite_model: str = "gemma3:1b",
+                 weaviate_ollama_url: str = "http://host.docker.internal:11434",
+                 cache: Optional[SemanticCache] = None):
         self.weaviate_url = weaviate_url
         self.ollama_url = ollama_url
-        self.llamaparse_api_key = llamaparse_api_key
-        if llamaparse_api_key is None:
-            self.llamaparse_api_key = os.getenv('LLAMAPARSE_API_KEY')
+        self.weaviate_ollama_url = weaviate_ollama_url
+        self.llamaparse_api_key = llamaparse_api_key or os.getenv('LLAMAPARSE_API_KEY')
         self.embedding_model = embedding_model
         self.generative_model = generative_model
+        self.rewrite_model = rewrite_model
+        self.cache = cache
         
         parsed = urlparse(self.weaviate_url)
         self.client = weaviate.connect_to_local(host=parsed.hostname, port=parsed.port or 8080)
@@ -45,7 +50,14 @@ class LocalRAGSystem:
         
         self.setup_ollama_models()
         self.setup_schema()
-    
+        atexit.register(self.close)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
     def setup_ollama_models(self):
         """
         Ensure required Ollama models are available
@@ -67,7 +79,12 @@ class LocalRAGSystem:
                 if not any(self.generative_model in model for model in models):
                     print(f"Pulling generative model: {self.generative_model}")
                     self._pull_ollama_model(self.generative_model)
-                
+
+                # Pull rewrite model if not available
+                if not any(self.rewrite_model in model for model in models):
+                    print(f"Pulling rewrite model: {self.rewrite_model}")
+                    self._pull_ollama_model(self.rewrite_model)
+
                 print("✅ Ollama models ready!")
             else:
                 print("⚠️  Could not connect to Ollama. Make sure it's running on port 11434")
@@ -82,7 +99,8 @@ class LocalRAGSystem:
                 json={"name": model_name},
                 stream=True
             )
-            
+            response.raise_for_status()
+
             for line in response.iter_lines():
                 if line:
                     data = json.loads(line)
@@ -97,7 +115,7 @@ class LocalRAGSystem:
         """
         Create Weaviate schema with enhanced metadata for page-aware processing
         """
-        collection_name = "DocumentChunk"
+        collection_name = self.COLLECTION_NAME
 
         if self.client.collections.exists(collection_name):
             print("✅ Using existing Weaviate collection")
@@ -107,12 +125,12 @@ class LocalRAGSystem:
             collection = self.client.collections.create(
                 name=collection_name,
                 description="Chunks of documents for RAG with local Ollama and page awareness",
-                vector_config=Configure.Vectorizer.text2vec_ollama(
-                    api_endpoint=self.ollama_url,
+                vectorizer_config=Configure.Vectorizer.text2vec_ollama(
+                    api_endpoint=self.weaviate_ollama_url,
                     model=self.embedding_model
                 ),
                 generative_config=Configure.Generative.ollama(
-                    api_endpoint=self.ollama_url,
+                    api_endpoint=self.weaviate_ollama_url,
                     model=self.generative_model,
                 ),
                 properties=[
@@ -304,7 +322,7 @@ class LocalRAGSystem:
         """
         print(f"Importing {len(chunks)} chunks to Weaviate...")
         
-        collection = self.client.collections.get("DocumentChunk")
+        collection = self.client.collections.get(self.COLLECTION_NAME)
         
         # Use v4 batch insert
         try:
@@ -336,7 +354,11 @@ class LocalRAGSystem:
         Full pipeline: Parse -> Chunk -> Import (Page-Aware)
         """
         print(f"\n🚀 Processing document: {file_path}")
-        
+
+        if self.cache:
+            if self.cache.clear():
+                print(f"🗑️  Cache cleared (re-indexing {os.path.basename(file_path)})")
+
         # Step 1: Parse document into pages
         if use_llamaparse and self.llamaparse_api_key:
             print("1. 📄 Parsing with LlamaParse (page-aware)...")
@@ -387,8 +409,18 @@ class LocalRAGSystem:
     def _source_filter(self, source_file: Optional[str] = None):
         return Filter.by_property("sourceFile").equal(source_file) if source_file else None
 
+    def _format_chunk_citation(self, chunk: Dict, index: int) -> str:
+        headers = " > ".join(chunk.get("precedingHeaders", []))
+        page = f"Page {chunk.get('pageNumber', '?')}"
+        if chunk.get("totalPages"):
+            page += f"/{chunk['totalPages']}"
+        label = f"{index + 1}. {os.path.basename(chunk['sourceFile'])} ({page})"
+        if headers:
+            label += f" - {headers}"
+        return label
+
     def search(self, query: str, limit: int = 5, source_file: Optional[str] = None, min_content_length: int = 150, alpha: float = 0.75) -> List[Dict]:
-        collection = self.client.collections.get("DocumentChunk")
+        collection = self.client.collections.get(self.COLLECTION_NAME)
         # alpha: 0.0 = pure BM25 (keyword), 1.0 = pure vector (semantic)
         # Over-fetch so we have candidates left after filtering bare headers.
         response = collection.query.hybrid(
@@ -412,7 +444,7 @@ class LocalRAGSystem:
 
     def section_filtered_search(self, query: str, required_sections: List[str], limit: int = 5, source_file: Optional[str] = None, alpha: float = 0.75) -> List[Dict]:
         """Search within specific document sections."""
-        collection = self.client.collections.get("DocumentChunk")
+        collection = self.client.collections.get(self.COLLECTION_NAME)
         response = collection.query.hybrid(
             query=query,
             alpha=alpha,
@@ -431,7 +463,7 @@ class LocalRAGSystem:
 
     def search_by_page(self, query: str, page_numbers: Optional[List[int]] = None, limit: int = 5, source_file: Optional[str] = None, alpha: float = 0.75) -> List[Dict]:
         """Search within specific pages."""
-        collection = self.client.collections.get("DocumentChunk")
+        collection = self.client.collections.get(self.COLLECTION_NAME)
         response = collection.query.hybrid(
             query=query,
             alpha=alpha,
@@ -467,12 +499,20 @@ Passage:"""
         except Exception:
             return question
 
-    def ask_question(self, question: str, max_chunks: int = 5, section_filter: Optional[List[str]] = None, page_filter: Optional[List[int]] = None, source_file: Optional[str] = None, alpha: float = 0.75, use_hyde: bool = False) -> str:
+    def ask_question(self, question: str, max_chunks: int = 5, section_filter: Optional[List[str]] = None, page_filter: Optional[List[int]] = None, source_file: Optional[str] = None, alpha: float = 0.75, use_hyde: bool = False, use_rewrite: bool = False, use_cache: bool = True) -> str:
         print(f"\n🤔 Question: {question}")
+        settings = f"expand={use_rewrite}|hyde={use_hyde}|alpha={alpha}"
+
+        if use_cache and self.cache:
+            cached = self.cache.get(question, source_file, settings)
+            if cached is not None:
+                return cached
 
         search_query = question
+        if use_rewrite:
+            search_query = self.rewrite_query(question)
         if use_hyde:
-            search_query = self.generate_hypothetical_answer(question)
+            search_query = self.generate_hypothetical_answer(search_query)
 
         if page_filter:
             chunks = self.search_by_page(search_query, page_filter, max_chunks, source_file, alpha=alpha)
@@ -500,34 +540,22 @@ Passage:"""
         # Build context with page and header information
         context_parts = []
         for i, chunk in enumerate(chunks):
-            headers = " > ".join(chunk.get('precedingHeaders', []))
-            page_info = f"Page {chunk.get('pageNumber', '?')}"
-            if chunk.get('totalPages'):
-                page_info += f"/{chunk.get('totalPages')}"
-            
-            source_info = f"[{os.path.basename(chunk['sourceFile'])} - {page_info}"
-            if headers:
-                source_info += f" - {headers}"
-            source_info += "]"
-            
-            context_parts.append(f"Source {i+1}: {source_info}\n{chunk['content']}")
-        
+            citation = self._format_chunk_citation(chunk, i)
+            context_parts.append(f"Source {i+1}: [{citation}]\n{chunk['content']}")
+
         context = "\n\n" + "="*50 + "\n\n".join(context_parts)
-        
-        # Build the prompt
-        prompt = f"""Answer this question using ONLY the sources provided below: {question}
 
-    Sources:
-    {context}
-
-    Instructions:
-    - Use ONLY information explicitly stated in the sources above. Do NOT use outside knowledge.
-    - Do NOT invent definitions, acronym expansions, or explanations not present in the sources.
-    - If the sources do not contain enough information to answer, say exactly: "The provided documents do not contain enough information to answer this question."
-    - Reference specific document sections and page numbers when relevant
-    - Keep your answer concise but complete
-
-    Answer:"""
+        prompt = (
+            f"Answer this question using ONLY the sources provided below: {question}\n\n"
+            f"Sources:\n{context}\n\n"
+            "Instructions:\n"
+            "- Use ONLY information explicitly stated in the sources above. Do NOT use outside knowledge.\n"
+            "- Do NOT invent definitions, acronym expansions, or explanations not present in the sources.\n"
+            '- If the sources do not contain enough information to answer, say exactly: "The provided documents do not contain enough information to answer this question."\n'
+            "- Reference specific document sections and page numbers when relevant\n"
+            "- Keep your answer concise but complete\n\n"
+            "Answer:"
+        )
         try:
             response = requests.post(
                 f"{self.ollama_url}/api/generate",
@@ -539,27 +567,21 @@ Passage:"""
         except Exception as e:
             print(f"⚠️ Ollama generation failed: {e}")
             generated_answer = f"I found relevant information but couldn't generate a proper answer. Here's what I found:\n\n{context[:1000]}..."
-        
-        # Add source information with page numbers
-        source_info = "\n\n📚 Sources:\n"
+
+        source_footer = "\n\n📚 Sources:\n"
         for i, chunk in enumerate(chunks):
-            headers = " > ".join(chunk.get('precedingHeaders', []))
-            page_info = f"Page {chunk.get('pageNumber', '?')}"
-            if chunk.get('totalPages'):
-                page_info += f"/{chunk.get('totalPages')}"
-            
-            source_line = f"  {i+1}. {os.path.basename(chunk['sourceFile'])} ({page_info})"
-            if headers:
-                source_line += f" - {headers}"
-            source_info += source_line + "\n"
-        
-        return generated_answer + source_info
+            source_footer += f"  {self._format_chunk_citation(chunk, i)}\n"
+
+        full_answer = generated_answer + source_footer
+        if use_cache and self.cache:
+            self.cache.set(question, full_answer, source_file, settings)
+        return full_answer
 
     def get_document_stats(self) -> Dict:
         """
         Get statistics about imported documents with page information - Simple version
         """
-        collection = self.client.collections.get("DocumentChunk")
+        collection = self.client.collections.get(self.COLLECTION_NAME)
         
         try:
             # Get total count
@@ -601,40 +623,55 @@ Passage:"""
             }
     
     def rewrite_query(self, question: str) -> str:
-        prompt = f"""You are a search query expander for a technical document retrieval system. Expand the question into a short search query that includes the core topic plus relevant synonyms and related technical terms. Use English only. Return only the expanded query, nothing else.
+        prompt = f"""You are a search query expander for document retrieval. Your job is to add synonyms and closely related terms to help find the answer in any type of document.
 
-Question: what models to use for rerank
-Expanded: rerank cross-encoder reranker bi-encoder two-stage retrieval ms-marco bge-reranker
+Rules:
+- Only add terms that are directly related to what the question is asking about.
+- For short factual questions ("What is X?", "Who is Y?"), keep the expansion tight — 3 to 5 terms maximum.
+- Never invent terms that could belong to a different topic entirely.
+- Return only the expanded query. Use English only.
+
+Question: what is RAG
+Expanded: RAG retrieval augmented generation pipeline architecture
 
 Question: how does chunking work
 Expanded: chunking text splitting document segmentation sentence splitting chunk size overlap
 
-Question: what is RAG
-Expanded: RAG retrieval augmented generation retrieval-augmented pipeline architecture
+Question: what is the main topic
+Expanded: main topic subject purpose overview summary
+
+Question: what are the requirements
+Expanded: requirements qualifications criteria conditions prerequisites
 
 Question: how to reduce hallucination
-Expanded: hallucination reduction grounding faithfulness factuality citation verification
+Expanded: hallucination reduction grounding faithfulness factuality
 
 Question: {question}
 Expanded:"""
         try:
             response = requests.post(
                 f"{self.ollama_url}/api/generate",
-                json={"model": self.generative_model, "prompt": prompt, "stream": False},
+                json={"model": self.rewrite_model, "prompt": prompt, "stream": False},
                 timeout=30,
             )
             response.raise_for_status()
-            rewritten = response.json().get("response", question).strip()
+            expansion = response.json().get("response", "").strip()
+            # Always keep original terms — expansion is additive, never a replacement.
+            # This ensures named features/proper nouns from the question survive even
+            # when the small rewrite model paraphrases them away.
+            rewritten = f"{question} {expansion}" if expansion else question
             print(f"🔄 Query expanded: '{question}' → '{rewritten}'")
             return rewritten
         except Exception:
             return question
 
     def reset(self):
-        collection_name = "DocumentChunk"
+        collection_name = self.COLLECTION_NAME
         if self.client.collections.exists(collection_name):
             self.client.collections.delete(collection_name)
         self.setup_schema()
+        if self.cache: #redis
+            self.cache.clear()
         print("✅ Collection reset — all documents removed.")
 
     def close(self):

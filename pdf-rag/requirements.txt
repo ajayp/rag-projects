@@ -1,3 +1,5 @@
 llama-cloud-services==0.6.94
 weaviate-client==4.21.0
 gradio
+redis==7.4.0
+redisvl==0.18.1
