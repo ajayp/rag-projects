@@ -8,11 +8,11 @@ A fully local RAG system that answers natural language questions over PDF docume
 - Vector storage and retrieval with **Weaviate**
 - Local embedding and generation with **Ollama** (`nomic-embed-text` + `qwen2.5:14b`)
 - Hybrid search — BM25 keyword + semantic vector with a tunable alpha slider
-- Two-pass chunking: markdown structure first, then sentence-level size limits — chunks never cross page boundaries
-- **Result filtering** — bare header chunks and table-of-contents entries are filtered out before being passed to the LLM, preventing low-content results from occupying source slots
+- Page-aware chunking — chunks never cross page boundaries
+- **Result filtering** — low-content chunks (headers, TOC entries) filtered before context assembly
 - **Result deduplication** — identical chunks are deduplicated before context assembly
 - Answers include **source citations** — page numbers and section names from the original document
-- **Query expansion** — runs via `gemma3:1b` (fast, lightweight) to add synonyms and related terms before searching, bridging vocabulary gaps between your question and the document's language
+- **Query expansion** — adds synonyms and related terms before searching to bridge vocabulary gaps
 - **HyDE** (Hypothetical Document Embeddings) — LLM generates a hypothetical answer passage and searches with that, improving retrieval for conceptual questions
 - **Semantic cache** — repeated or semantically similar questions are served from Redis without hitting the LLM again, reducing latency on common queries
 - Browser UI with drag-and-drop PDF upload and document filter
@@ -158,11 +158,11 @@ Opens at `http://localhost:7860`. Upload PDFs via the sidebar, then ask question
 
 ### Search options
 
-| Option | What it *actually* does | When it's the right tool | When it will absolutely betray you |
+| Option | What it *actually* does | When it's the right tool | When to avoid |
 | --- | --- | --- | --- |
-| **Query Expansion** | Deterministically broadens the query using known synonyms, aliases, taxonomies, or controlled vocabularies. | When user phrasing ≠ corpus phrasing. When you need higher recall without semantic drift. | When expansions are LLM-generated instead of dictionary-driven — you get invented synonyms and polluted retrieval. |
-| **HyDE** | Generates a hypothetical "ideal answer", embeds it, and retrieves documents semantically similar to that hallucinated answer. | Conceptual, prose-heavy, narrative corpora. Questions about mechanisms, explanations, or high-level reasoning. | Technical domains, API names, model names, framework questions, entity-sensitive retrieval. HyDE hallucinates terms → retrieval collapses. |
-| **Search mode slider** | Blends BM25 keyword matching with semantic vector search. 0 = keyword only, 1 = semantic only. | Default 0.75 works well for technical docs. Slide toward 0 for exact-term queries, toward 1 for conceptual ones. | Pure BM25 (0) misses synonyms; pure vector (1) misses rare technical terms that don't embed distinctively. |
+| **Query Expansion** | Deterministically broadens the query using known synonyms, aliases, taxonomies, or controlled vocabularies. | When user phrasing ≠ corpus phrasing. When you need higher recall without semantic drift. | LLM-generated expansions — invented synonyms pollute retrieval. |
+| **HyDE** | Generates a hypothetical "ideal answer", embeds it, and retrieves documents semantically similar to that hallucinated answer. | Conceptual, prose-heavy, narrative corpora. Questions about mechanisms, explanations, or high-level reasoning. | Technical domains and entity-sensitive queries — hallucinated terms collapse results. |
+| **Search mode slider** | Blends BM25 keyword matching with semantic vector search. 0 = keyword only, 1 = semantic only. | Default 0.75 works well for technical docs. Slide toward 0 for exact-term queries, toward 1 for conceptual ones. | Pure BM25 misses synonyms; pure vector misses rare technical terms. |
 
 ### Not implemented: reranking
 
@@ -177,10 +177,7 @@ Multi-hop retrieval (iterative retrieval where the answer to one query informs t
 ## Cleanup
 
 ```bash
-docker compose down           # stop Weaviate + Redis
-ollama rm nomic-embed-text    # remove embedding model (optional)
-ollama rm qwen2.5:14b         # remove generative model (optional)
-ollama rm gemma3:1b           # remove query rewrite model (optional)
+docker compose down  # stop Weaviate + Redis
 ```
 
 
