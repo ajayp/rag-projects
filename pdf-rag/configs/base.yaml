@@ -1,0 +1,24 @@
+weaviate:
+  url: "http://localhost:8080"
+  ollama_url: "http://host.docker.internal:11434"
+  collection_name: "DocumentChunk"
+
+ollama:
+  url: "http://localhost:11434"
+  embedding_model: "nomic-embed-text"
+  generative_model: "qwen2.5:14b"
+  rewrite_model: "gemma3:1b"
+
+chunking:
+  chunk_size: 512
+  chunk_overlap: 100
+  min_content_length: 150
+
+retrieval:
+  default_alpha: 0.75
+  default_limit: 5
+
+cache:
+  redis_url: "redis://localhost:6379"
+  distance_threshold: 0.12
+  ttl: 3600

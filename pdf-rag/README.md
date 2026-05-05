@@ -29,7 +29,7 @@ A fully local RAG system that answers natural language questions over PDF docume
                  │
                  ▼
 ┌─────────────────────────────────┐
-│       Semantic Cache Check      │◄─── SemanticCache (cache.py)
+│       Semantic Cache Check      │◄─── SemanticCache (src/caching/semantic_cache.py)
 └────────────────┬────────────────┘
         hit │         │ miss
             │         ▼
@@ -152,7 +152,8 @@ export LLAMAPARSE_API_KEY="your_api_key_here"
 ## Usage
 
 ```bash
-python app.py
+python -m apps.gradio_app
+# or: python main.py
 ```
 
 Opens at `http://localhost:7860`. Upload PDFs via the sidebar, then ask questions in the chat.

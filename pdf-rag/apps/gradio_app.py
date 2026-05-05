@@ -1,13 +1,19 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import os
 import gradio as gr
-from rag import LocalRAGSystem
-from cache import SemanticCache
+from src.rag_system import LocalRAGSystem
+from src.caching.semantic_cache import SemanticCache
 
 _cache = SemanticCache()
 if _cache.is_available():
     print("✅ Semantic cache connected (Redis)")
 else:
     print("⚠️  Redis not reachable — semantic cache disabled")
+    _cache = None
 
 # Initialized at module level because Gradio wires event handlers at import time.
 # Ensure Weaviate (port 8080) and Ollama (port 11434) are running before launching.
@@ -70,7 +76,14 @@ def submit(message, history, doc_choice, rewrite, alpha, use_hyde, use_cache):
     if not message.strip():
         return history, ""
     source_file = resolve_source_file(doc_choice)
-    answer = rag.ask_question(message, source_file=source_file, alpha=alpha, use_hyde=use_hyde, use_rewrite=rewrite, use_cache=use_cache)
+    answer = rag.ask_question(
+        message,
+        source_file=source_file,
+        alpha=alpha,
+        use_hyde=use_hyde,
+        use_rewrite=rewrite,
+        use_cache=use_cache,
+    )
     history.append({"role": "user", "content": message})
     history.append({"role": "assistant", "content": answer})
     return history, ""
