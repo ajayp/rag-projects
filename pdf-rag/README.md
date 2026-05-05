@@ -19,6 +19,10 @@ A fully local RAG system that answers natural language questions over PDF docume
 
 ---
 
+<img width="1380" height="962" alt="image" src="https://github.com/user-attachments/assets/8aa67d25-a92d-4ac2-bc43-6ae0dc9f2556" />
+
+---
+
 ## Query Pipeline
 
 ```
@@ -101,12 +105,6 @@ A fully local RAG system that answers natural language questions over PDF docume
 ```
 
 ---
-
-<img width="1434" height="984" alt="image" src="https://github.com/user-attachments/assets/58590644-e719-4cac-b9e7-95908231ab16" />
-
-
----
-
 ## Prerequisites
 
 ### 1. Docker
