@@ -2,6 +2,22 @@
 
 A collection of Retrieval-Augmented Generation (RAG) projects built with [Weaviate](https://weaviate.io/) and [Ollama](https://ollama.com/) for fully local or hybrid vector search and LLM inference.
 
+## System Architecture & Philosophy
+The core message behind these projects is that **robust RAG is not simply a "vector DB plus a prompt"**. Instead, I treat RAG as a layered, full-stack decision system consisting of:
+
+*   **Ingestion:** Documents are normalized, structures are parsed, metadata is attached, and every source is versioned to ensure a traceable "chain of custody".
+*   **Indexing:** I generate embeddings, optionally build lexical indexes for **BM25**, and utilize a **parent-child storage strategy** to preserve broader context while maintaining retrieval precision.
+*   **Retrieval & Reranking:** At query time, candidates are retrieved using **hybrid search** (BM25 + vector). Where precision matters, a **reranker** can be layered in — though this adds latency and is not always necessary.
+*   **Generation & Assembly:** The best evidence is assembled into a **bounded prompt**, instructing the model to answer *only* from the retrieved context.
+*   **Evaluation & Monitoring:** Every stage should be instrumented for quality (faithfulness, relevance) to catch silent failures early — this is often the last thing built and the first thing that pays off in production.
+
+By following this layered approach, I mitigate the issues that cause most production RAG failures: **bad evidence, weak retrieval, or poor uncertainty handling**.
+
+## Design Philosophy: Framework Selection
+For these projects, I leaned on **LlamaIndex** and **LlamaParse** because they strike a good balance between development speed, flexibility, and manageable complexity. They’re great for getting prototypes quickly, and they remove a lot of the routine wiring that doesn’t add real value. Frameworks should simplify the plumbing, not obscure the parts that matter.
+
+If a use case pushes beyond generic framework behaviour whether due to stability, latency pressure, or customization needs, my strategy is to transition to a minimal custom orchestration layer. That keeps retrieval logic, prompt construction, evaluation, and observability transparent and easy to reason, even as the underlying framework evolves.
+
 ## Projects
 
 ### [pdf-rag](./pdf-rag/)
