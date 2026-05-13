@@ -1,0 +1,26 @@
+{
+  "name": "ts",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.6.0",
+    "dotenv": "^17.4.2",
+    "js-yaml": "^4.1.1",
+    "redis": "^5.12.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3",
+    "weaviate-ts-client": "^2.2.0",
+    "llamaindex": "^0.9.4"
+  }
+}
