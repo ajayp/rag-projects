@@ -1,27 +1,29 @@
 ---
 services:
-  redis:
+  redis-pdf-rag-python:
     image: redis/redis-stack-server:latest
+    profiles: [pdf-rag-python]
     ports:
       - "6379:6379"
     restart: on-failure:0
     volumes:
-      - redis_data:/data
+      - pdf-rag-python-redis:/data
 
-  weaviate:
+  weaviate-pdf-rag-python:
+    profiles: [pdf-rag-python]
     command:
-    - --host
-    - 0.0.0.0
-    - --port
-    - '8080'
-    - --scheme
-    - http
+      - --host
+      - 0.0.0.0
+      - --port
+      - '8080'
+      - --scheme
+      - http
     image: cr.weaviate.io/semitechnologies/weaviate:1.31.1
     ports:
       - "8080:8080"
       - "50051:50051"
     volumes:
-    - weaviate_data:/var/lib/weaviate
+      - pdf-rag-python-weaviate:/var/lib/weaviate
     restart: on-failure:0
     environment:
       QUERY_DEFAULTS_LIMIT: 25
@@ -31,7 +33,69 @@ services:
       ENABLE_MODULES: 'text2vec-ollama,generative-ollama'
       CLUSTER_HOSTNAME: 'node1'
       OLLAMA_HOST: 'http://host.docker.internal:11434'
-volumes:
-  weaviate_data:
-  redis_data:
 
+  redis-pdf-rag-ts:
+    image: redis/redis-stack-server:latest
+    profiles: [pdf-rag-ts]
+    ports:
+      - "6379:6379"
+    restart: on-failure:0
+    volumes:
+      - pdf-rag-ts-redis:/data
+
+  weaviate-pdf-rag-ts:
+    profiles: [pdf-rag-ts]
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - '8080'
+      - --scheme
+      - http
+    image: cr.weaviate.io/semitechnologies/weaviate:1.31.1
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    volumes:
+      - pdf-rag-ts-weaviate:/var/lib/weaviate
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      ENABLE_API_BASED_MODULES: 'true'
+      ENABLE_MODULES: 'text2vec-ollama,generative-ollama'
+      CLUSTER_HOSTNAME: 'node1'
+      OLLAMA_HOST: 'http://host.docker.internal:11434'
+
+  weaviate-rag-tutorial:
+    profiles: [rag-tutorial]
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - '8080'
+      - --scheme
+      - http
+    image: cr.weaviate.io/semitechnologies/weaviate:1.31.1
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    volumes:
+      - rag-tutorial-weaviate:/var/lib/weaviate
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      ENABLE_API_BASED_MODULES: 'true'
+      ENABLE_MODULES: 'text2vec-ollama,generative-ollama'
+      CLUSTER_HOSTNAME: 'node1'
+      OLLAMA_HOST: 'http://host.docker.internal:11434'
+
+volumes:
+  pdf-rag-python-redis:
+  pdf-rag-python-weaviate:
+  pdf-rag-ts-redis:
+  pdf-rag-ts-weaviate:
+  rag-tutorial-weaviate:

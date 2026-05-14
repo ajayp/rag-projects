@@ -36,9 +36,9 @@ export LLAMAPARSE_API_KEY="your_api_key_here"
    ollama serve
    ```
 
-2. **Start Weaviate:**
+2. **Start Weaviate + Redis** (from repo root):
    ```bash
-   docker compose up -d
+   docker compose --profile pdf-rag-ts up -d
    ```
 
 3. **Install Node dependencies and build:**
@@ -63,6 +63,11 @@ export LLAMAPARSE_API_KEY="your_api_key_here"
 
    Opens at `http://localhost:7861`.
 
+## Cleanup
+
+```bash
+docker compose --profile pdf-rag-ts down  # stop Weaviate
+```
 
 ## Usage
 
@@ -142,5 +147,5 @@ Cross-encoder reranking (e.g. `ms-marco-MiniLM-L-6-v2`, `BAAI/bge-reranker-large
 
 Multi-hop retrieval (iterative retrieval where the answer to one query informs the next) is not implemented. For single-document Q&A, most questions are single-hop and don't require chaining lookups. It becomes worthwhile when answers genuinely span multiple large documents or require following references across sections.
 
-
+---
 
