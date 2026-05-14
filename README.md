@@ -20,7 +20,16 @@ If a use case pushes beyond generic framework behaviour whether due to stability
 
 ## Projects
 
-### [pdf-rag](./pdf-rag/)
+### [rag-tutorial](./rag-tutorial/)
+**RAG Tutorial — Node.js / TypeScript**
+
+A step-by-step tutorial that builds a RAG pipeline from scratch using a 7k-book dataset. Covers collection setup, data ingestion with automatic vectorization, semantic (_vector_) search, and generative (_RAG_) search — good starting point for understanding the difference between the two.
+
+**Stack:** Node.js · TypeScript · Weaviate · Ollama
+
+---
+
+### [pdf-rag-python](./pdf-rag-python/)
 **Local Document Q&A — Python**
 
 A production-style RAG system for answering natural language questions over PDF documents. Parses PDFs with LlamaParse (_preserving page and section structure_), stores embeddings in Weaviate, and generates cited answers with page references using Ollama — no external LLM API required at inference time.
@@ -31,18 +40,18 @@ Features hybrid BM25 + semantic search, query expansion (_via `gemma3:1b`_), HyD
 
 ---
 
-### [rag-tutorial](./rag-tutorial/)
-**RAG Tutorial — Node.js / TypeScript**
+### [pdf-rag-ts](./pdf-rag-ts/)
+**Local Document Q&A — TypeScript**
 
-A step-by-step tutorial that builds a RAG pipeline from scratch using a 7k-book dataset. Covers collection setup, data ingestion with automatic vectorization, semantic (_vector_) search, and generative (_RAG_) search — good starting point for understanding the difference between the two.
+A TypeScript port of the same production-style PDF Q&A system. Parses PDFs with LlamaParse, stores embeddings in Weaviate, and generates cited answers via Ollama. Supports four chunking strategies (_Standard, Hierarchical, Contextual, Full-Page_), hybrid BM25 + semantic search, and query augmentation (_rewrite + HyDE_).
 
-**Stack:** Node.js · TypeScript · Weaviate · Ollama
+**Stack:** Node.js · TypeScript · Weaviate · Ollama · LlamaParse · Browser UI
 
 ---
 
 ## Shared Prerequisites
 
-Both projects require:
+All projects require:
 
 - **[Docker](https://www.docker.com/)** — runs Weaviate locally
 - **[Ollama](https://ollama.com/)** — runs embedding and generation models locally
@@ -54,6 +63,6 @@ ollama pull qwen2.5:14b        # text generation
 ollama pull gemma3:1b          # query rewrite (pdf-rag)
 ```
 
-**pdf-rag** also requires **Redis** (_semantic cache_) — run alongside Weaviate via `docker compose up -d`.
+**pdf-rag-python** also requires **Redis** (_semantic cache_) — run alongside Weaviate via `docker compose up -d`.
 
 See each project's README for setup and run instructions.
