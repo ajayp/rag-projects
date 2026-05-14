@@ -3,15 +3,14 @@
 A fully local RAG system that answers natural language questions over PDF documents. Parses and chunks PDFs using **LlamaParse**, stores embeddings in **Weaviate**, and generates cited answers with page references using **Ollama** — no external LLM API required.
 
 ## Features
-- Configuration loading from `configs/base.yaml`
 - Document parsing with LlamaParse
 - Page-aware chunking with MarkdownNodeParser and SentenceSplitter
-- Weaviate schema setup and batch importing
 - Multiple chunking strategies, refer to **Chunking strategies** below 
 - Hybrid search (BM25 + Vector)
 - Query augmentation (Rewrite + HyDE)
 - Answer generation with Ollama
-- Document statistics and reset functionality
+
+<img width="1134" height="531" alt="image" src="https://github.com/user-attachments/assets/63c0fcbb-96a9-473c-ad82-a13ed5fe27f5" />
 
 ## Prerequisites
 
