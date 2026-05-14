@@ -63,6 +63,16 @@ ollama pull qwen2.5:14b        # text generation
 ollama pull gemma3:1b          # query rewrite (pdf-rag)
 ```
 
-**pdf-rag-python** also requires **Redis** (_semantic cache_) — run alongside Weaviate via `docker compose up -d`.
+All infrastructure runs from a single `docker-compose.yml` at the repo root. Each project has its own isolated Weaviate and Redis volumes — start only what you need using profiles:
+
+```bash
+# pdf-rag-python
+docker compose --profile pdf-rag-python up -d
+docker compose --profile pdf-rag-python down
+
+# pdf-rag-ts
+docker compose --profile pdf-rag-ts up -d
+docker compose --profile pdf-rag-ts down
+```
 
 See each project's README for setup and run instructions.

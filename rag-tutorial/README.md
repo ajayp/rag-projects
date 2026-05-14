@@ -17,10 +17,11 @@ A step-by-step tutorial that builds a **Retrieval-Augmented Generation (RAG)** p
 ## Environment Setup
 
 ### 1. Start Weaviate with Docker
+Run from the repo root:
 ```bash
-docker-compose -f docker-compose.yml up -d
+docker compose --profile rag-tutorial up -d
 ```
-> The current `docker-compose.yml` includes Ollama modules only. For a different vectorizer, see the [Weaviate Docker Installation Guide](https://weaviate.io/developers/weaviate/installation/docker-compose).
+> Infrastructure is managed in a shared `docker-compose.yml` at the repo root. For vectorizer options, see the [Weaviate Docker Installation Guide](https://weaviate.io/developers/weaviate/installation/docker-compose).
 
 ### 2. Install Ollama and Pull Models
 Download Ollama from [ollama.com](https://ollama.com), then pull the required models:

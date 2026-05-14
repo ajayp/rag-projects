@@ -140,10 +140,16 @@ export LLAMAPARSE_API_KEY="your_api_key_here"
    pip install -r requirements.txt
    ```
 
-4. **Start Weaviate:**
+4. **Start Weaviate + Redis** (from repo root):
    ```bash
-   docker compose up -d
+   docker compose --profile pdf-rag-python up -d
    ```
+
+## Cleanup
+
+```bash
+docker compose --profile pdf-rag-python down  # stop Weaviate + Redis
+```
 
 ---
 
@@ -174,8 +180,4 @@ Multi-hop retrieval (iterative retrieval where the answer to one query informs t
 
 ---
 
-## Cleanup
 
-```bash
-docker compose down  # stop Weaviate + Redis
-```
