@@ -20,19 +20,10 @@ If a use case pushes beyond generic framework behaviour whether due to stability
 
 ## Projects
 
-### [rag-tutorial](./rag-tutorial/)
-**RAG Tutorial — Node.js / TypeScript**
-
-A step-by-step tutorial that builds a RAG pipeline from scratch using a 7k-book dataset. Covers collection setup, data ingestion with automatic vectorization, semantic (_vector_) search, and generative (_RAG_) search — good starting point for understanding the difference between the two.
-
-**Stack:** Node.js · TypeScript · Weaviate · Ollama
-
----
-
 ### [pdf-rag-python](./pdf-rag-python/)
 **Local Document Q&A — Python**
 
-A production-style RAG system for answering natural language questions over PDF documents. Parses PDFs with LlamaParse (_preserving page and section structure_), stores embeddings in Weaviate, and generates cited answers with page references using Ollama — no external LLM API required at inference time.
+A RAG system for answering natural language questions over PDF documents. Parses PDFs with LlamaParse (_preserving page and section structure_), stores embeddings in Weaviate, and generates cited answers with page references using Ollama — no external LLM API required at inference time.
 
 Features hybrid BM25 + semantic search, query expansion (_via `gemma3:1b`_), HyDE (_Hypothetical Document Embeddings_), and a Redis-backed semantic cache that serves repeated or semantically similar questions without hitting the LLM again.
 
@@ -43,9 +34,18 @@ Features hybrid BM25 + semantic search, query expansion (_via `gemma3:1b`_), HyD
 ### [pdf-rag-ts](./pdf-rag-ts/)
 **Local Document Q&A — TypeScript**
 
-A TypeScript port of the same production-style PDF Q&A system. Parses PDFs with LlamaParse, stores embeddings in Weaviate, and generates cited answers via Ollama. Supports four chunking strategies (_Standard, Hierarchical, Contextual, Full-Page_), hybrid BM25 + semantic search, and query augmentation (_rewrite + HyDE_).
+A TypeScript port of the Python RAG system but supports **four chunking strategies** (_Standard, Hierarchical, Contextual, Full-Page_)
 
 **Stack:** Node.js · TypeScript · Weaviate · Ollama · LlamaParse · Browser UI
+
+---
+
+### [rag-tutorial](./rag-tutorial/)
+**RAG Tutorial — Node.js / TypeScript**
+
+A step-by-step tutorial that builds a RAG pipeline from scratch using a 7k-book dataset. Covers collection setup, data ingestion with automatic vectorization, semantic (_vector_) search, and generative (_RAG_) search — good starting point for understanding the difference between the two.
+
+**Stack:** Node.js · TypeScript · Weaviate · Ollama
 
 ---
 
