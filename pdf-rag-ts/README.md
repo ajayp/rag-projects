@@ -9,8 +9,10 @@ A fully local RAG system that answers natural language questions over PDF docume
 - Hybrid search (BM25 + Vector)
 - Query augmentation (Rewrite + HyDE)
 - Answer generation with Ollama
+- Natural Language Inference (NLI) for retrieval conflict detection - coming soon
+- Semantic caching - coming soon
 
-<img width="1134" height="531" alt="image" src="https://github.com/user-attachments/assets/63c0fcbb-96a9-473c-ad82-a13ed5fe27f5" />
+<img width="1120" height="540" alt="image" src="https://github.com/user-attachments/assets/d5cd7b16-c7d8-4840-8759-5ad54177e617" />
 
 ## Prerequisites
 
